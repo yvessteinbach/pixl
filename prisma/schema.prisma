@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanTier {
+  FREE
+  BASIC
+  PRO
+}
+
+enum ServiceType {
+  WEB_SERVICE
+  DATABASE
+  CUSTOM
+}
+
+enum DeployMode {
+  AUTO
+  MANUAL
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  plan          PlanTier        @default(FREE)
+  accounts      Account[]
+  sessions      Session[]
+  sites         Site[] // Custom for pixl
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@unique([identifier, token])
+}
+
+model Site {
+  id                String      @id @default(cuid())
+  name              String
+  repoUrl           String
+  providerId        String? // e.g. github repo ID
+  dockerPort        Int?
+  status            String      @default("BUILDING")
+  subdomain         String?     @unique
+  serviceType       ServiceType @default(WEB_SERVICE)
+  deployMode        DeployMode  @default(AUTO)
+  branch            String      @default("main")
+  installCommand    String?
+  buildCommand      String?
+  startCommand      String?
+  pendingCommitSha  String?
+  pendingCommitBranch String?
+  pendingCommitAt   DateTime?
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Deployment {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  status    String   @default("BUILDING") // BUILDING, READY, FAILED
+  source    String   // "github_import", "webhook_push"
+  dockerPort Int?
+  containerName String?
+  branch    String?
+  commitSha String?
+  isCurrent Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
